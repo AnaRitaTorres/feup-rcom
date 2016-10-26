@@ -16,12 +16,13 @@
 #define TRUE 1
 
 #define FLAG 0x7E
-#define ESCAPE 0x7D
+#define ESC 0x7D
 #define A_TRANSMITTER 0x03
 #define A_RECEIVER 0x01
 #define C_SET 0x03
 #define C_UA 0x07
 #define C_DISC 0X0B
+#define STUFF 0x20
 
 #define NR_TRIES  3
 #define WAIT_TIME 3
@@ -50,12 +51,14 @@ int sendDISC(int fd);
 
 int receiveSET(int fd);
 
-int stuffing(unsigned char byte);
+int numESC(char * buffer, int length);
+
+void stuffing(char *c,char *buf,int length);
 
 int ll_open(char *portName,int status);
 
 int ll_close(int fd, int status);
 
-int llwrite(int fd,char * buffer, int length);
+int ll_write(int fd,char * buffer, int length);
 
-int llread(int fd, char * buffer);
+int ll_read(int fd, char * buffer);
