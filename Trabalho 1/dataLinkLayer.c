@@ -19,169 +19,103 @@ void alarm_handler(){
 	printf("alarme # %d\n", numberTries);
 	flag=1;
 	numberTries++;
+}
+
+
+int equal(unsigned char * buffer, const unsigned char * toCompare, int length){
+	int success = 0, i;
+	for (i=0; i < length; i++){
+		if (buffer[i] != toCompare[i]){
+			success = -1;
+			break;
+		}
+	}
+	return success;
+}
+
+int writeInfo(const unsigned char *buffer, int length){
+
+	int res, aux=0;
+	while(aux < length){
+
+		res = write(fd, buffer + aux, length - aux);
+
+		if (res == length)
+			return 0;
+
+		aux += res;
+
+		if (res == -1)
+			return -1;
+
+	}
+	return 0;
+}
+
+int readInfo(unsigned char *buffer, int length){
+	int res;
+	int aux=0;
+
+	while (aux < length && numberTries<linkL.numTransmissions){
+
+		res = read(fd, buffer+aux, length-aux);
+
+		aux+=res;
+
+		if (res == -1)
+			return -1;
+	}
+	
+	return 0;
 
 }
+
+
+int readInfoTimeOut(unsigned char *buffer, int length){
+	int res;
+	int aux=0;
+
+	while (aux < length && numberTries<linkL.numTransmissions){
+
+		if (flag){
+			alarm(1);
+			flag=0;
+		}
+
+		res = read(fd, buffer+aux, length-aux);
+
+		aux+=res;
+
+		if (res == -1)
+			return -1;
+	}
+
+	if (numberTries == linkL.numTransmissions)
+		return -1;
+
+	return 0;
+
+}
+
 
 int sendSET(int fd){
 
-		int res, success, i;
-		char buf[255];
+	unsigned char buf[255];
+	
+	while(numberTries < linkL.numTransmissions){
 
-		//enables the alarm WAIT_TIME seconds
-		if(flag){
-		  alarm(linkL.timeout);
-		  flag=0;
-		}
-
-		while(numberTries < linkL.numTransmissions){
-
-				//sends SET to receiver
-				res = write(fd, SET, sizeof(SET));
-
-				if (res == sizeof(SET)){
-					break;
-				}
-		}
-		printf("Enviou SET.\n");
-
-		while(numberTries < linkL.numTransmissions){
-				success=1;
-				//checks if it receives UA
-				res = read(fd, buf, sizeof(UA_TRANSMITTER));
-
-				if (res != sizeof(UA_TRANSMITTER)){
-					continue;
-				}
-
-				for (i=0; i < sizeof(UA_TRANSMITTER); i++){
-						if (buf[i] != UA_TRANSMITTER[i]){
-							success =0;
-							break;
-						}
-				}
-				
-				if (success==1){
-					if (DEBUG)
-						printf("Recebeu UA_TRANSMITTER\n");
-					return 0;
-					
-				}
-		}
-
-		return -1;
-	}
-
-	int sendDISC(int fd){
-			int res, success, i;
-			char buf[255];
-			numberTries=0;
-
-			//enables the alarm WAIT_TIME seconds
-			if(flag){
-				alarm(linkL.timeout);
-			  	flag=0;
-			}
-
-			while(numberTries < linkL.numTransmissions){
-
-				//sends SET to receiver
-				res = write(fd, DISC_TRANSMITTER, sizeof(DISC_TRANSMITTER));
-
-				if (res == sizeof(DISC_TRANSMITTER)){
-					break;
-				}
-			}
-			if (DEBUG)
-				printf("Escreveu DISC_TRANSMITTER.\n");
-
-			while(numberTries < linkL.numTransmissions){
-				success=1;
-				//checks if it receives anything
-				res = read(fd, buf, sizeof(DISC_RECEIVER));
-
-				if (res != sizeof(DISC_RECEIVER)){
-						continue;
-				}
-
-				for (i=0; i<sizeof(DISC_RECEIVER); i++){
-					if (buf[i] != DISC_RECEIVER[i]){
-						success =0;
-						break;
-					}
-				}
-
-				if (success == 1){
-					if (DEBUG)
-						printf("Recebeu DISC_RECEIVER.\n");
-					break;
-				}
-			}
-
-			while(numberTries < linkL.numTransmissions){
-				
-				res = write(fd, UA_RECEIVER, sizeof(UA_RECEIVER));
-
-				if (res == sizeof(UA_RECEIVER)){
-					printf("Enviou UA_RECEIVER.\n");
-					return 0;
-				}
-			}
-	return -1;
-}
-
-
-int receiveDISC(int fd){
-	int res, i, success;
-	char buf[255];
-	while(1){
-		success=1;
-		res =read(fd, buf,sizeof(DISC_TRANSMITTER));
-
-	   	if(res != sizeof(DISC_TRANSMITTER))
-		   continue;
-
-		for(i=0; i < sizeof(DISC_TRANSMITTER); i++){
-
-			if(buf[i]!= DISC_TRANSMITTER[i]){
-				success = 0;
-				break;
-			}
-		}
-
-		if (success = 1){
-			if (DEBUG)
-				printf("Recebeu DISC_TRANSMITTER.\n");
-			break;
-		}
-	}
-
-	while(1){
-		res = write(fd, DISC_RECEIVER, sizeof(DISC_RECEIVER));
-
-		if (res== sizeof(DISC_RECEIVER)){
-			printf("Enviou DISC_RECEIVER.\n");
-			break;
-		}
-	}
-
-	while(1){
-		success = 1;
-
-		res = read(fd, buf,sizeof(UA_RECEIVER));
-
-		if(res != sizeof(UA_RECEIVER))
+		if (writeInfo(SET, (int)sizeof(SET)) == -1){
 			continue;
+		}
+		printf("Escreveu SET.\n");
 
-		for(i=0; i < sizeof(UA_RECEIVER);i++){
-
-			if(buf[i]!= UA_RECEIVER[i]){
-				success = 0;
-			    break;
-			}
+		if (readInfoTimeOut(buf, (int)sizeof(UA_TRANSMITTER)) == -1){
+			numberTries=0; //acabar se não der ou reenviar??
+			continue;
 		}
 
-		if (success){
-			printf("Recebeu UA_RECEIVER.\n");
+		if (equal(buf, UA_TRANSMITTER, (int)sizeof(UA_TRANSMITTER)) == 0){
+			printf("Recebeu UA.\n");
 			return 0;
 		}
 	}
@@ -191,40 +125,31 @@ int receiveDISC(int fd){
 
 int receiveSET(int fd){
 
-	int res, i, success;
 	char buf[255];
-	while(1){
-		success=1;
-		res =read(fd, buf,sizeof(SET));
 
-	   	if(res != sizeof(SET))
-		   continue;
+	while(1){
+
+		if (readInfo(buf, (int)sizeof(SET)) == -1){
+			printf("Não leu.\n");
+			continue;
+		}
 		
-		for(i=0; i < sizeof(SET);i++){
-
-			if(buf[i]!= SET[i]){
-				success=0;
-			    break;
-			}
+		if (equal(buf, SET, (int)sizeof(SET)) == -1){
+			printf("Não recebeu SET.\n");
+			continue;
 		}
-		if (success==1){
-			printf("Recebeu SET.\n");
-			break;
-		}
-	}
 
-	while(1){
-		res = write(fd, UA_TRANSMITTER, sizeof(UA_TRANSMITTER));
-
-		if (res == sizeof(UA_TRANSMITTER)){
-			printf("Escreveu UA_TRANSMITTER.\n");
-			return 0;
+		if (writeInfo(UA_TRANSMITTER, (int)sizeof(UA_TRANSMITTER)) == -1){
+			printf("Não escreveu.\n");
+			continue;
 		}
+
+		printf("Escreveu UA.\n");
+		return 0;
 	}
 }
 
-
-int ll_open(char *portName,int status){
+int ll_open(char *portName){
 
 	/*opening the port*/
 	fd = open(portName, O_RDWR | O_NOCTTY);
@@ -261,29 +186,97 @@ int ll_open(char *portName,int status){
 
 	printf("New termios structure set\n");
 
-	if(status==TRANSMITTER){
+	if(linkL.status==TRANSMITTER){
 		if(sendSET(fd)==-1){
 			return -1;
 		}
 	}
-	else if(status==RECEIVER){
+	else if(linkL.status==RECEIVER){
 		if(receiveSET(fd)==-1){
 			return -1;
 		}
 	}
 	else
-			return -1;
+		return -1;
 
 	return 0;
 }
 
+int sendDISC(int fd){
+	
+	char buf[255];
+	numberTries=0;
 
-int ll_close(int fd, int status)
-{
-		if(status==TRANSMITTER){
+	while(numberTries < linkL.numTransmissions){
+
+		if (writeInfo(DISC_TRANSMITTER, (int)sizeof(DISC_TRANSMITTER)) == -1){
+			continue;
+		}
+
+		printf("Escreveu Disc.\n");
+		
+		if (readInfoTimeOut(buf, (int)sizeof(DISC_RECEIVER)) == -1){
+			numberTries=0;
+			continue;
+		}
+
+		printf("Leu Disc.\n");
+
+		if (equal(buf, DISC_RECEIVER, (int)sizeof(DISC_RECEIVER)) == -1)
+			continue;
+
+		printf("Recebeu Disc.\n");
+
+		if (writeInfo(UA_RECEIVER, (int)sizeof(UA_RECEIVER)) == -1){
+			continue;
+		}
+
+		printf("Escreveu UA.\n");
+
+		return 0;
+	}
+}
+
+
+
+int receiveDISC(int fd){
+
+	char buf[255];
+	while(1){
+
+		if (readInfo(buf, (int)sizeof(DISC_TRANSMITTER)) == -1){
+			printf("Não leu Disc.\n");
+			continue;
+		}
+
+		if (equal(buf, DISC_TRANSMITTER, (int)sizeof(DISC_TRANSMITTER)) == -1){
+			continue;
+		}
+		printf("Recebeu Disc.\n");
+
+		if (writeInfo(DISC_RECEIVER, (int)sizeof(DISC_RECEIVER)) == -1){
+			printf("Não escreveu Disc.\n");
+			continue;
+		}
+		
+		if (readInfo(buf, (int)sizeof(UA_RECEIVER)) == -1){
+			continue;
+		}
+
+		if (equal(buf, UA_RECEIVER, (int)sizeof(UA_RECEIVER)) == 0){
+			printf("Recebeu UA.\n");
+			return 0;
+		}
+
+	}
+
+}
+
+int ll_close(int fd){
+		if(linkL.status==TRANSMITTER){
 			sendDISC(fd);
 		}
-		else if (status==RECEIVER){
+		else if (linkL.status==RECEIVER){
 			receiveDISC(fd);
 		}
 		else
@@ -311,34 +304,34 @@ int numESC(char * buffer, int length){
 	return c_ESC;
 }
 
-void stuffing(char *c,char *buf, int length){
+void stuffing(char *to_stuff,char *stuffing, int length){
 
     int i,j=0;
 	
    
     for(i=0; i < length; i++){
 
-        if(c[i]==FLAG){
-          buf[j]=ESC;
+        if(to_stuff[i]==FLAG){
+          stuffing[j]=ESC;
 		  j++;
-          buf[j]=FLAG^STUFF;
+          stuffing[j]=FLAG^STUFF;
         }
-        else if(c[i]==ESC){
-          buf[j]=ESC;
+        else if(to_stuff[i]==ESC){
+          stuffing[j]=ESC;
 		  j++;
-          buf[j]=ESC^STUFF;
+         stuffing[j]=ESC^STUFF;
         }
         else
-          buf[j]=c[i];
+          stuffing[j]=to_stuff[i];
 
         j++;
 
     }
-    buf[j]='\0';
+    stuffing[j]='\0';
 }
 
 
-int buildFrame(char * stuffed_buffer, int length){
+int buildIFrame(char * stuffed_buffer, int length){
 
 	//without stuffing
 	int i, bcc2;
@@ -364,55 +357,113 @@ int buildFrame(char * stuffed_buffer, int length){
 
 }
 
-
 int ll_write(int fd, char * buffer, int length){
 
+	int res, aux=0;
 	char * stuffed_buf;
-	int header_size=4; //F A C BCC1 
-	int trailer_size=2; //BCC2 F
+	int header_size = 4; //F A C BCC1 
+	int trailer_size = 2; //BCC2 F
 	int number_to_stuff = numESC(buffer,length);
 	int total_buffer_size = length + number_to_stuff;
-	int total_frame_size = length+number_to_stuff+ header_size+ trailer_size;
+	int total_frame_size = length+number_to_stuff + header_size + trailer_size;
 
 	
-	stuffed_buf = (char*)malloc(length+1+number_to_stuff);
+	stuffed_buf = (char*)malloc(total_buffer_size+1);
+	
 
 	stuffing(buffer,stuffed_buf,length+1);
 
-	buildFrame(stuffed_buf,total_buffer_size);
+	buildIFrame(stuffed_buf,total_buffer_size);
+
+	while(numberTries < linkL.numTransmissions){
+
+		//verificar
+		//manda só o que ainda não enviou
+		res = write(fd,linkL.frame + aux ,total_frame_size - aux);
+		
+		if (res == total_frame_size){
+			printf("Enviou frame.\n");
+			return 0;
+		}
+
+		aux = res;
+
+		if (res == -1)
+			aux=0;
+
+	}
+	return -1;
+}
+
+void destuffing(char *to_destuff,char*destuffing, int length){
+
+	int i;
+	int j=0;
+	
+	for(i=0;i < length;i++){
+		if(to_destuff[i]==ESC){
+			destuffing[j]= to_destuff[++i]^STUFF;
+		}
+		else
+			destuffing[j]= to_destuff[i];
+
+		j++;
+		}
+}
+
+
+
+int ll_read(int fd, char * buffer, int length){
+
+	char * destuffed_buf;
+	destuffed_buf = (char*)malloc(length+1);
+	int res;
+	unsigned char *byte;
+
+	while(1){
+
+		
+
+	}
 
 }
 
-/*int ll_read(int fd, char * buffer);
-*/
 
 
 
 int main(int argc, char** argv){
 
 	int c, res;
-	char buf[255];
-	int i, sum = 0, speed = 0;
+	char buf[]={FLAG,'1','2'};
+	int sum = 0, speed = 0;
 
 	//inicializacoes
 	linkL.portName = argv[1];
 	linkL.timeout = WAIT_TIME;
 	linkL.numTransmissions = NR_TRIES;
-
+	linkL.status = TRANSMITTER;
 
 	(void) signal(SIGALRM,alarm_handler);
 
-	ll_open(linkL.portName ,TRANSMITTER);
+	if (ll_open(linkL.portName)){
+		printf("Falhou ll_open.\n");
+		return -1;
+	}
 
 	sleep(2);
 
-	buf[0] = FLAG;
-	buf[1] = '1';
-	buf[2] = '2';
+	/*if(linkL.status==TRANSMITTER)
+		ll_write(fd, buf,3);
+	else if(linkL.status==RECEIVER)
+		ll_read(fd,buf,3);
+	else
+		{
+			printf("Status errado!\n");
+			return 1;
+		}
+*/
 
-	ll_write(fd, buf, 3);
-
-	ll_close(fd, TRANSMITTER);
+	ll_close(fd);
 
   return 0;
 }
