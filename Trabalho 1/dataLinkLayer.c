@@ -99,7 +99,7 @@ int readInfoTimeOut(unsigned char *buffer, int length){
 
 
 int sendSET(int fd){
-
+	int aux;
 	unsigned char buf[255];
 	
 	while(numberTries < linkL.numTransmissions){
@@ -109,8 +109,9 @@ int sendSET(int fd){
 		}
 		printf("Escreveu SET.\n");
 
+		aux=numberTries+1;
 		if (readInfoTimeOut(buf, (int)sizeof(UA_TRANSMITTER)) == -1){
-			numberTries=0; //acabar se não der ou reenviar??
+			numberTries=aux; //acabar se não der ou reenviar??
 			continue;
 		}
 
@@ -204,6 +205,7 @@ int ll_open(char *portName){
 
 int sendDISC(int fd){
 	
+	int aux;
 	char buf[255];
 	numberTries=0;
 
@@ -215,8 +217,9 @@ int sendDISC(int fd){
 
 		printf("Escreveu Disc.\n");
 		
-		if (readInfoTimeOut(buf, (int)sizeof(DISC_RECEIVER)) == -1){
-			numberTries=0;
+		aux=numberTries+1;
+		if (readInfoTimeOut(buf, (int)sizeof(UA_TRANSMITTER)) == -1){
+			numberTries=aux; //acabar se não der ou reenviar??
 			continue;
 		}
 
@@ -237,15 +240,12 @@ int sendDISC(int fd){
 	}
 }
 
-
-
 int receiveDISC(int fd){
 
 	char buf[255];
 	while(1){
 
 		if (readInfo(buf, (int)sizeof(DISC_TRANSMITTER)) == -1){
-			printf("Não leu Disc.\n");
 			continue;
 		}
 
@@ -255,9 +255,9 @@ int receiveDISC(int fd){
 		printf("Recebeu Disc.\n");
 
 		if (writeInfo(DISC_RECEIVER, (int)sizeof(DISC_RECEIVER)) == -1){
-			printf("Não escreveu Disc.\n");
 			continue;
 		}
+		printf("Escreveu Disc.\n");
 		
 		if (readInfo(buf, (int)sizeof(UA_RECEIVER)) == -1){
 			continue;
@@ -331,23 +331,23 @@ void stuffing(char *to_stuff,char *stuffing, int length){
 }
 
 
-int buildIFrame(char * stuffed_buffer, int length){
+int buildIFrame(char * stuffed_packet,unsigned char a, unsigned char c, int length){
 
 	//without stuffing
 	int i, bcc2;
 	
 	linkL.frame[0] = FLAG;
-	linkL.frame[1] = A_TRANSMITTER;
-	linkL.frame[2] = (linkL.sequenceNumber << 6);	// C = 0 S 0 0 0 0 0 0
-	linkL.frame[3] = linkL.frame[1]^linkL.frame[2];  //ver se é necessário cópia para guardar dados
+	linkL.frame[1] = a;
+	linkL.frame[2] = c;	
+	linkL.frame[3] = a^c;  //ver se é necessário cópia para guardar dados
 	
 	for (i=0; i < length; i++){
-		linkL.frame[i+4] = stuffed_buffer[i];
+		linkL.frame[i+4] = stuffed_packet[i];
 
 		if(i==0)
-			bcc2 = stuffed_buffer[i];
+			bcc2 = stuffed_packet[i];
 		else
-			bcc2 ^= stuffed_buffer[i];
+			bcc2 ^= stuffed_packet[i];
 	}
 
 	linkL.frame[i+4] = bcc2;
@@ -357,45 +357,59 @@ int buildIFrame(char * stuffed_buffer, int length){
 
 }
 
-int ll_write(int fd, char * buffer, int length){
+int buildFrame(unsigned char a, unsigned char c){
 
-	int res, aux=0;
-	char * stuffed_buf;
+	
+	linkL.frame[0] = FLAG;
+	linkL.frame[1] = a;
+	linkL.frame[2] = c;	
+	linkL.frame[3] = a^c;  
+	linkL.frame[4] = FLAG;
+
+	return 0;
+}
+
+int ll_write(int fd, char * packet, int length){
+
+	int res;
+	char buffer[MAX_SIZE];
+	char * stuffed_packet;
 	int header_size = 4; //F A C BCC1 
 	int trailer_size = 2; //BCC2 F
-	int number_to_stuff = numESC(buffer,length);
+	int number_to_stuff = numESC(packet,length);
 	int total_buffer_size = length + number_to_stuff;
 	int total_frame_size = length+number_to_stuff + header_size + trailer_size;
+	unsigned char a=A_TRANSMITTER, c=(linkL.sequenceNumber << 6);
 
+	printf("entrou na llwrite\n");
+	stuffed_packet = (char*)malloc(total_buffer_size+1);
 	
-	stuffed_buf = (char*)malloc(total_buffer_size+1);
-	
+	stuffing(packet,stuffed_packet,length+1);
 
-	stuffing(buffer,stuffed_buf,length+1);
-
-	buildIFrame(stuffed_buf,total_buffer_size);
+	buildIFrame(stuffed_packet,a,c,total_buffer_size);
 
 	while(numberTries < linkL.numTransmissions){
 
-		//verificar
-		//manda só o que ainda não enviou
-		res = write(fd,linkL.frame + aux ,total_frame_size - aux);
+		res = write(fd,linkL.frame,total_frame_size);
 		
 		if (res == total_frame_size){
 			printf("Enviou frame.\n");
-			return 0;
+			break;
 		}
-
-		aux = res;
-
-		if (res == -1)
-			aux=0;
-
+	
 	}
+
+	int t=receiveFrame(fd,linkL.frame,A_RECEIVER,C_RR|| C_REJ);
+	int x;
+	
+	for(x=0;x < t;x++){
+		printf("%02x\n",linkL.frame[x]);
+	}
+
 	return -1;
 }
 
-void destuffing(char *to_destuff,char*destuffing, int length){
+int destuffing(char *to_destuff,char*destuffing, int length){
 
 	int i;
 	int j=0;
@@ -407,29 +421,257 @@ void destuffing(char *to_destuff,char*destuffing, int length){
 		else
 			destuffing[j]= to_destuff[i];
 
-		j++;
+			
+			j++;
 		}
+
+		return j;
 }
 
+int receiveFrame(int fd, char * frame, unsigned char a, unsigned char c){
+	
+	unsigned char byte;
+	int res,i=0;
+	State s = START_RCV;
+	
 
+	while(s!=STOP_RCV){
+		res=read(fd,&byte,1);
 
-int ll_read(int fd, char * buffer, int length){
+		if(res!=1){
+			continue;
+		}
 
-	char * destuffed_buf;
-	destuffed_buf = (char*)malloc(length+1);
-	int res;
-	unsigned char *byte;
+		switch(s){
 
-	while(1){
+			case START_RCV:
+				if (byte == FLAG){
+					frame[i++] = byte;
+					s = FLAG_RCV;
+				}
+				break;
 
+             case FLAG_RCV:
+                if (byte == a){
+                    frame[i++] = byte;
+                    s = A_RCV;
+                }
+                else if (byte == FLAG);
+                else{
+                        s = START_RCV;
+						i=0;
+                }
+                break;
+
+				case A_RCV:
+                    if (byte == FLAG){
+						s = FLAG_RCV;
+						i=1;
+                    }
+                    else if (byte==c){
+							frame[i++]=byte;
+							s=C_RCV;
+					}
+					else{
+						s=START_RCV;
+						i=0;
+					}
+                    break;
+
+                case C_RCV:
+                    if (byte == FLAG){
+                            s=FLAG_RCV;
+							i=1;
+                    }
+                    else if(byte==(frame[1]^frame[2])){
+                            frame[i++]=(frame[1]^frame[2]);
+							s = BCC_OK;
+                    }
+					else{
+						s=START_RCV;
+						i=0;
+					}
+                    break;
+
+                case BCC_OK:
+                    if (byte == FLAG){
+							frame[i++] = byte;
+							s = STOP_RCV;
+                    }
+                    else{
+                        s=START_RCV;
+						i=0;
+
+                    }
+                    break;
+
+                default:
+                	break;
+                }
+		}
+		return i;
+}
+
+int receiveIFrame(int fd, char * frame){
+	
+	unsigned char byte, bcc2=0;
+	int res,i=0;
+	State s = START_RCV;
+	
+
+	while(s!=STOP_RCV){
+
+		res=read(fd,&byte,1);
 		
+		if(res!=1){
+			printf("Não leu o byte.\n");
+			break;
+		}
 
+		switch(s){
+
+			case START_RCV:
+				if (byte == FLAG){
+					frame[i++] = byte;
+					s = FLAG_RCV;
+				}
+				break;
+
+             case FLAG_RCV:
+                if (byte == A_TRANSMITTER){
+                    frame[i++] = byte;
+                    s = A_RCV;
+                }
+                else if (byte == FLAG);
+                else{
+                        s = START_RCV;
+						i=0;
+                }
+                break;
+
+				case A_RCV:
+                    if (byte == FLAG){
+						s = FLAG_RCV;
+						i=1;
+                    }
+                    else if (byte==C_S0){
+							frame[i++]=byte;
+							s=C_RCV;
+					}
+					else if(byte==C_S4){
+							frame[i++]=byte;
+							s=C_RCV;
+                    }
+					else{
+						s=START_RCV;
+						i=0;
+					}
+                    break;
+
+                case C_RCV:
+                    if (byte == FLAG){
+                            s=FLAG_RCV;
+							i=1;
+                    }
+                    else if(byte==(frame[1]^frame[2])){
+                            frame[i++]=(frame[1]^frame[2]);
+							s = BCC_OK;
+                    }
+					else{
+						s=START_RCV;
+						i=0;
+					}
+                    break;
+
+                case BCC_OK:
+                    if (byte == FLAG){
+							frame[++i] = byte;
+							s = STOP_RCV;
+                    }
+                    else{
+                        frame[i++] = byte;
+						bcc2^=byte;
+
+                    }
+                        break;
+
+                default:
+                        break;
+                }
+		}
+		frame[--i]=bcc2;
+		return i+1;
+}
+
+int getPacket(char * buffer,char * packet, int buffer_size){
+
+	int i,j=0;
+	for(i=4; i < buffer_size-2;i++,j++){
+		packet[j]=buffer[i];
 	}
 
+	return j;
 }
 
+int ll_read(int fd, char * buffer, int buffer_size){
 
+	char * destuffed_packet, * packet;
+	unsigned char c;
+	int to_destuff_size, destuffed_packet_size, sequence, packet_size, bcc2_aux = buffer[buffer_size-2], bcc1_aux = buffer[3];
+			
+	to_destuff_size= receiveIFrame(fd,buffer);
+	
+	destuffed_packet = (char*)malloc(to_destuff_size);
+	packet = (char*)malloc(to_destuff_size-6);
 
+	packet_size=getPacket(buffer,packet,to_destuff_size);
+
+	destuffed_packet_size=destuffing(packet,destuffed_packet,packet_size);
+	
+	sequence = (destuffed_packet[2] >> 6);
+
+	if(linkL.frame[3]!=bcc1_aux || linkL.frame[packet_size-2]!=bcc2_aux){
+
+		if(sequence==0){
+			c = (0 << 7) | C_REJ;
+			buildFrame(A_RECEIVER,c);
+			write(fd,linkL.frame,5);
+		}
+		else if(sequence==1){
+			c = (1 << 7) | C_REJ;
+			buildFrame(A_RECEIVER,c);
+			write(fd,linkL.frame,5);
+		}
+	}
+	else{
+
+		if(sequence == 0){
+			c = (1 << 7) | C_RR;
+			buildFrame(A_RECEIVER,c);
+			write(fd,linkL.frame,5);
+		}
+		else if(sequence == 1){
+			c = (0 << 7) | C_RR;
+			buildFrame(A_RECEIVER,c);
+			write(fd,linkL.frame,5);
+		}
+
+	}
+	int x;
+	for(x=0; x < 5;x++){
+		printf("%02x\n",linkL.frame[x]);
+	}
+
+	if(linkL.sequenceNumber==1){
+		linkL.sequenceNumber=0;
+	}
+	else if(linkL.sequenceNumber==0){
+		linkL.sequenceNumber=1;
+	}
+
+	return 0;
+
+}
 
 int main(int argc, char** argv){
 
@@ -452,16 +694,15 @@ int main(int argc, char** argv){
 
 	sleep(2);
 
-	/*if(linkL.status==TRANSMITTER)
+	if(linkL.status==TRANSMITTER)
 		ll_write(fd, buf,3);
 	else if(linkL.status==RECEIVER)
-		ll_read(fd,buf,3);
-	else
-		{
+		 ll_read(fd,linkL.frame,3);
+	else{
 			printf("Status errado!\n");
 			return 1;
 		}
-*/
+
 
 	ll_close(fd);
 

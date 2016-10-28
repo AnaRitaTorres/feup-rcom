@@ -25,6 +25,8 @@
 #define C_DISC 0X0B
 #define C_REJ 0x01
 #define C_RR 0x05
+#define C_S0 0x00
+#define C_S4 0x40
 #define STUFF 0x20
 
 #define NR_TRIES  3
@@ -62,9 +64,13 @@ int receiveSET(int fd);
 
 int numESC(char * buffer, int length);
 
+
+
+int destuffing(char *to_destuff,char*destuffing, int length);
+
 void stuffing(char *to_stuff,char *stuffing, int length);
 
-void desstuffing(char *to_desstuff,char*desstuffing, int length);
+int receiveFrame(int fd, char * frame, unsigned char a, unsigned char c);
 
 int writeInfo(const unsigned char *buffer, int length);
 
@@ -78,4 +84,4 @@ int ll_close(int fd);
 
 int ll_write(int fd,char * buffer, int length);
 
-int ll_read(int fd, char * buffer, int length);
+int ll_read(int fd, char * buffer, int buffer_size);
