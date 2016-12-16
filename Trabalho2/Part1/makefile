@@ -23,7 +23,6 @@ buildtemp/%.o: src/%
 	$(CCC) $(INCLUDES) $(CCFLAGS) -c $< -o $@
 
 $(OUT): $(OBJ)
-	mkdir -p bin
 	$(CCC) $(INCLUDES) $(CCFLAGS) $(OBJ) $(LIBS) -o $(OUT)
 
 clean:
@@ -35,3 +34,4 @@ test:
 
 all:
 	make
+

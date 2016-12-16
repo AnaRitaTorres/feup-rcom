@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "URL.h"
 #include "FTP.h"
 
@@ -20,7 +21,7 @@ int main(int argc, char** argv) {
 	/*****************	URL	*****************/
 
 	url url;
-	
+
 	//Initializes url
 	initURL(&url, argv[1]);
 
@@ -46,7 +47,7 @@ int main(int argc, char** argv) {
 
 	// Verifying password
 	char* password;
-	if(user == "anonymous"){
+	if(strcmp(user,"anonymous")==0){
 		printf("You are now entering in anonymous mode.\n");
 		password = NULL;
 	}
@@ -68,20 +69,20 @@ int main(int argc, char** argv) {
 	}
 
 	// Changing directory
-	if (ftpCWD(&ftp, url.path)) {
+	if (ftpChangeDir(&ftp, url.path)) {
 		printf("ERROR: Cannot change directory to the folder of %s\n",
 				url.filename);
 		return -1;
 	}
 
 	// Entry in passive mode
-	if (ftpPasv(&ftp)) {
+	if (ftpPassive(&ftp)) {
 		printf("ERROR: Cannot entry in passive mode\n");
 		return -1;
 	}
 
 	// Begins transmission of a file from the remote host
-	ftpRetr(&ftp, url.filename);
+	ftpRetrieve(&ftp, url.filename);
 
 	// Starting file transfer
 	ftpDownload(&ftp, url.filename);
@@ -91,4 +92,3 @@ int main(int argc, char** argv) {
 
 	return 0;
 }
-

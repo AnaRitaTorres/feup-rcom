@@ -65,8 +65,9 @@ int parseURL(url * url){
 	}
 
 	//Remove protocol 'ftp' from string and make a copy of it
-	char * tmpURL = (char *) malloc(strlen(url->urlToParse)-6);
+	char * tmpURL = (char *) malloc(strlen(url->urlToParse)-5);
 	strcpy(tmpURL, url->urlToParse+6);
+	tmpURL[strlen(tmpURL)]='\0';
 
 	if (url->hasUser){
 		
@@ -104,7 +105,6 @@ int parseURL(url * url){
 
 		char * hostAndName = strchr(tmpURL, ']');
 		strcpy(tmpURL, hostAndName+2);
-
 		
 		free(auxiliar);
 	}
@@ -123,8 +123,7 @@ int parseURL(url * url){
 
 
 	//Get Path
-	
-	char *totalPath = strchr(tmpURL + 1, '/');
+	char *totalPath = strchr(tmpURL+1 , '/');
 	char *path = getStringBeforeChar(totalPath+1, '/');
 
 	while(path != NULL){
@@ -140,11 +139,12 @@ int parseURL(url * url){
 		totalPath = strchr(totalPath + 1, '/');
 		path = getStringBeforeChar(totalPath+1, '/');
 	}	
-	
+	strcat(url->path, "/");
 	
 
 	//Get name of file
 	strcpy(url->filename, totalPath+1);
+	url->filename[strlen(totalPath)] = '\0';
 
 	if (checkIfValid(url->filename) == -1){
 		printf("Error: Invalid filename\n");
@@ -152,13 +152,13 @@ int parseURL(url * url){
 	}
 	
 	
-/*
-	printf("\nuser %s\n", url->user);
+
+	/*printf("\nuser %s\n", url->user);
 	printf("\npass %s\n", url->password);
 	printf("\nhost %s\n", url->host);
 	printf("\npath %s\n", url->path);
-	printf("\nfilename %s\n", url->filename);*/
-
+	printf("\nfilename %s\n", url->filename);
+*/
 	free(tmpURL);
 
 	if (okay == -1)
