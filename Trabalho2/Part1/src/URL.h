@@ -34,4 +34,4 @@ void initURL(url* url, const char* urlToParse);
 int parseURL(url* url); // Parse a string with the url to create the URL structure
 int getIpByHost(url* url); // gets an IP by host name
 int checkIfValid(char * string);
-char * getStringBeforeChar(char * string, char symbol)
+char * getStringBeforeChar(char * string, char symbol);
