@@ -11,35 +11,35 @@ void printUsage(char* argv0) {
 
 int main(int argc, char** argv) {
 
-	/* Verifies if input is valid (right number of arguments) */
-	if (argc != 2) {
-		printf("WARNING: Wrong number of arguments.\n");
+		if (argc != 2) {
+		printf("Invalid Number of Arguments.\n");
 		printUsage(argv[0]);
 		return 1;
 	}
 
-	/*****************	URL	*****************/
+	/*URL*/
 
 	url url;
 
-	//Initializes url
 	initURL(&url, argv[1]);
 
-	// start parsing url->urlToParse to URL components
-	if (parseURL(&url) == -1)
+	if (parseURL(&url) == -1){
+		printf("parseURL failed!\n");
 		return -1;
+	}
+		
 
-	// edit url ip by hostname
 	if (getIpByHost(&url)) {
-		printf("ERROR: Cannot find ip to hostname %s.\n", url.host);
+		printf("Did not find IP to hostname %s.\n", url.host);
 		return -1;
 	}
 
 	printf("\nThe IP received to %s was %s\n", url.host, url.ip);
 
-	///////////// FTP CLIENT PROCESS /////////////
+	/*FTP*/
 
 	ftp ftp;
+	
 	ftpConnect(&ftp, url.ip, url.port);
 
 	// Verifying username
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
 	// Verifying password
 	char* password;
 	if(strcmp(user,"anonymous")==0){
-		printf("You are now entering in anonymous mode.\n");
+		printf("Anonymous Mode.\n");
 		password = NULL;
 	}
 	else if (strlen(url.password)) {
@@ -64,20 +64,20 @@ int main(int argc, char** argv) {
 
 	// Sending credentials to server
 	if (ftpLogin(&ftp, user, password)) {
-		printf("ERROR: Cannot login user %s\n", user);
+		printf("Did Not Login User: %s\n", user);
 		return -1;
 	}
 
 	// Changing directory
 	if (ftpChangeDir(&ftp, url.path)) {
-		printf("ERROR: Cannot change directory to the folder of %s\n",
+		printf("Did Not Change Directory of %s\n",
 				url.filename);
 		return -1;
 	}
 
 	// Entry in passive mode
 	if (ftpPassive(&ftp)) {
-		printf("ERROR: Cannot entry in passive mode\n");
+		printf("Passive Mode Not Active!\n");
 		return -1;
 	}
 

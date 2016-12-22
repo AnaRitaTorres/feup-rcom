@@ -3,20 +3,17 @@
 static int connectSocket(const char* ip, int port) {
 	int sockfd;
 	struct sockaddr_in server_addr;
-
-	// server address handling
+	
 	bzero((char*) &server_addr, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr(ip); /*32 bit Internet address network byte ordered*/
-	server_addr.sin_port = htons(port); /*server TCP port must be network byte ordered */
+	server_addr.sin_addr.s_addr = inet_addr(ip); 
+	server_addr.sin_port = htons(port);
 
-	// open an TCP socket
 	if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("socket()");
 		return -1;
 	}
 
-	// connect to the server
 	if (connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr))
 			< 0) {
 		perror("connect()");
@@ -55,7 +52,6 @@ int ftpLogin(ftp* ftp, const char* user, const char* password) {
 
 	char buffer[SIZE];
 
-	//Username
 	sprintf(buffer, "USER %s\r\n", user);
 
 	size_t buffer_size1 = strlen(buffer);
@@ -74,10 +70,8 @@ int ftpLogin(ftp* ftp, const char* user, const char* password) {
 
 	size_t buffer_size3 = sizeof(buffer);
 
-	// Cleaning Buffer
 	memset(buffer, 0, buffer_size3);
 
-	// Password
 	sprintf(buffer, "PASS %s\r\n", password);
 
 	size_t buffer_size4 = sizeof(buffer);
