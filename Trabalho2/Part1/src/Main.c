@@ -48,18 +48,11 @@ int main(int argc, char** argv) {
 	// Verifying password
 	char* password;
 	if(strcmp(user,"anonymous")==0){
-		printf("Anonymous Mode.\n");
+		printf("You are now entering in anonymous mode.\n");
 		password = NULL;
 	}
-	else if (strlen(url.password)) {
+	else {
 		password = url.password;
-	} else {
-		char buf[100];
-		printf("Please insert your college email as password: ");
-		while (strlen(fgets(buf, 100, stdin)) < 14)
-			printf("\nIncorrect input, please try again: ");
-		password = (char*) malloc(strlen(buf));
-		strncat(password, buf, strlen(buf) - 1);
 	}
 
 	// Sending credentials to server

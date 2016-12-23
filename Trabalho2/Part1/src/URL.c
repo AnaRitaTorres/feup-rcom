@@ -27,7 +27,6 @@ char * getStringBeforeChar(char * string, char symbol){
 
 
 	if(auxiliar == NULL){
-		//printf("Error! %s not found\n", symbol);
 		return NULL;
 	}
 
@@ -152,13 +151,6 @@ int parseURL(url * url){
 	}
 	
 	
-
-	/*printf("\nuser %s\n", url->user);
-	printf("\npass %s\n", url->password);
-	printf("\nhost %s\n", url->host);
-	printf("\npath %s\n", url->path);
-	printf("\nfilename %s\n", url->filename);
-*/
 	free(tmpURL);
 
 	if (okay == -1)
